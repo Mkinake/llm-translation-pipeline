@@ -1,0 +1,4 @@
+{
+  "balance.message": "Bonjour {username}, votre solde est de {amount} USD",
+  "error.network": "Quelque chose a mal tourné. Veuillez réessayer plus tard."
+}
