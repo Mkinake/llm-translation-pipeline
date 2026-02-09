@@ -1,4 +1,7 @@
 {
+  "login.title": "Bienvenue de nouveau",
+  "login.subtitle": "Connectez-vous pour continuer",
+  "login.button": "Se connecter",
   "balance.message": "Bonjour {username}, votre solde est de {amount} USD",
   "error.network": "Quelque chose a mal tourné. Veuillez réessayer plus tard."
 }
