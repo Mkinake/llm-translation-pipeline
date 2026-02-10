@@ -1,33 +1,70 @@
+"""
+LLM-based Localization Pipeline (Incremental CI/CD)
+
+Behavior:
+- Loads en.json (source)
+- Loads existing fr.json (if any)
+- Translates ONLY new or changed keys
+- Preserves existing translations
+- Enforces glossary
+- Protects placeholders
+- Writes merged fr.json
+"""
+
+# ================================
+# 1. Setup & Imports
+# ================================
+
 from openai import OpenAI
 import os
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Simple localization pipeline: English to French
-
 import json
+import csv
+import re
 from pathlib import Path
 
+# OpenAI client (API key comes from environment variable)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# File paths
 INPUT_FILE = Path("input/en.json")
 OUTPUT_FILE = Path("output/fr.json")
+
+# ================================
+# 2. Load Source (en.json)
+# ================================
 
 with open(INPUT_FILE, "r", encoding="utf-8") as f:
     source_data = json.load(f)
 
 print("Loaded strings:", len(source_data))
 
-##Glossary loading and application
+# ================================
+# 3. Load Existing Target (fr.json)
+#    This enables incremental CI/CD
+# ================================
 
-import csv
+def load_existing_translation(path):
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+existing_fr = load_existing_translation(OUTPUT_FILE)
+
+# ================================
+# 4. Glossary (CSV-based terminology)
+# ================================
 
 def load_glossary(csv_path):
     glossary = {}
+    if not Path(csv_path).exists():
+        return glossary
+
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             glossary[row["source"]] = row["target"]
     return glossary
-
 
 GLOSSARY = load_glossary("glossary.csv")
 
@@ -36,14 +73,11 @@ def apply_glossary(text, glossary):
         text = text.replace(source, target)
     return text
 
-
-
-###Detect placeholders
-import re
+# ================================
+# 5. Placeholder Handling
+# ================================
 
 PLACEHOLDER_PATTERN = re.compile(r"\{[^}]+\}")
-
-#### Mask function
 
 def mask_placeholders(text):
     placeholders = PLACEHOLDER_PATTERN.findall(text)
@@ -57,22 +91,48 @@ def mask_placeholders(text):
 
     return masked_text, mapping
 
-### Apply masking to all strings
+def restore_placeholders(text, mapping):
+    restored_text = text
+    for token, original in mapping.items():
+        restored_text = restored_text.replace(token, original)
+    return restored_text
 
-masked_data = {}
-placeholder_maps = {}
+def extract_placeholders(text):
+    return set(re.findall(r"<VAR\d+>", text))
 
-for key, value in source_data.items():
-    masked_text, mapping = mask_placeholders(value)
-    masked_data[key] = masked_text
-    placeholder_maps[key] = mapping
+# ================================
+# 6. Decide WHAT needs translation
+#    (Incremental / Delta logic)
+# ================================
 
+def get_keys_to_translate(source_en, existing_fr):
+    """
+    A key needs translation if:
+    - It does not exist in fr.json
+    - OR the English text has changed since last run
+    """
+    keys_to_translate = {}
 
-print("\n--- MASKED DATA ---")
-for k, v in masked_data.items():
-    print(k, "=>", v)
+    for key, en_text in source_en.items():
+        source_marker = f"__source__:{key}"
 
-###   LLM function
+        # New key
+        if key not in existing_fr:
+            keys_to_translate[key] = en_text
+
+        # Changed English text
+        elif existing_fr.get(source_marker) != en_text:
+            keys_to_translate[key] = en_text
+
+    return keys_to_translate
+
+keys_to_translate = get_keys_to_translate(source_data, existing_fr)
+
+print("Keys to translate:", list(keys_to_translate.keys()))
+
+# ================================
+# 7. LLM Translation Function
+# ================================
 
 def llm_translate(text, source_lang="en", target_lang="fr-FR"):
     prompt = f"""
@@ -89,7 +149,7 @@ Text:
 """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",   # fast & cost-effective
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You translate software UI strings."},
             {"role": "user", "content": prompt}
@@ -99,77 +159,42 @@ Text:
 
     return response.choices[0].message.content.strip()
 
+# ================================
+# 8. Translate ONLY delta keys
+# ================================
 
+for key, en_text in keys_to_translate.items():
+    # 1. Mask source
+    masked_text, mapping = mask_placeholders(en_text)
 
+    # 2. Translate (masked)
+    masked_translation = llm_translate(masked_text)
+    masked_translation = apply_glossary(masked_translation, GLOSSARY)
 
-##Apply translation
+    # 3. QA — validate masked placeholders
+    src_vars = extract_placeholders(masked_text)
+    tgt_vars = extract_placeholders(masked_translation)
 
-translated_data = {}
+    if src_vars != tgt_vars:
+        raise ValueError(f"❌ Placeholder mismatch in key '{key}'")
 
-for key, text in masked_data.items():
-    translated_text = llm_translate(text)
-    translated_text = apply_glossary(translated_text, GLOSSARY)
-    translated_data[key] = translated_text
+    # 4. Restore placeholders ONLY after QA
+    final_text = restore_placeholders(masked_translation, mapping)
 
+    # 5. Save result + source snapshot
+    existing_fr[key] = final_text
+    existing_fr[f"__source__:{key}"] = en_text
 
-print("\n--- TRANSLATED DATA ---")
-for k, v in translated_data.items():
-    print(k, "=>", v)
+print("✅ QA PASSED — placeholders are safe")
 
+# ================================
+# 10. Write Output (merged fr.json)
+# ================================
 
+OUTPUT_FILE.parent.mkdir(exist_ok=True)
 
-#Placeholder extraction helper
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    json.dump(existing_fr, f, ensure_ascii=False, indent=2)
 
-def extract_placeholders(text):
-    return set(re.findall(r"<VAR\d+>", text))
-
-### Validate placeholders
-
-for key in masked_data:
-    source_vars = extract_placeholders(masked_data[key])
-    target_vars = extract_placeholders(translated_data[key])
-
-    if source_vars != target_vars:
-        raise ValueError(
-            f"❌ Placeholder mismatch in key '{key}': "
-            f"{source_vars} vs {target_vars}"
-        )
-print("\n✅ QA PASSED — placeholders are safe")
-    
-#Restore Placeholders
-
-def restore_placeholders(text, mapping):
-    restored_text = text
-    for token, original in mapping.items():
-        restored_text = restored_text.replace(token, original)
-    return restored_text
-
-
-#Apply restore
-
-final_data = {}
-
-for key, translated_text in translated_data.items():
-    final_data[key] = restore_placeholders(
-        translated_text,
-        placeholder_maps[key]
-    )
-
-
-print("\n--- FINAL DATA ---")
-for k, v in final_data.items():
-    print(k, "=>", v)
-
-#Write Output File
-
-OUTPUT_DIR = Path("output")
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-
-output_file = OUTPUT_DIR / "fr.json"
-
-with open(output_file, "w", encoding="utf-8") as f:
-    json.dump(final_data, f, ensure_ascii=False, indent=2)
-print("\n🎉 Translation pipeline completed successfully!")
-print("📁 Output file:", output_file)
-
+print("🎉 Translation pipeline completed successfully!")
+print("📁 Output file:", OUTPUT_FILE)
