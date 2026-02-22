@@ -1,7 +1,12 @@
 {
-  "login.title": "Bienvenue de nouveau",
+  "login.title": "Bienvenue à nouveau",
+  "__source__:login.title": "Welcome back Again",
   "login.subtitle": "Connectez-vous pour continuer",
+  "__source__:login.subtitle": "Sign in to continue",
   "login.button": "Se connecter",
+  "__source__:login.button": "Log in",
   "balance.message": "Bonjour {username}, votre solde est de {amount} USD",
-  "error.network": "Quelque chose a mal tourné. Veuillez réessayer plus tard."
+  "__source__:balance.message": "Hello {username}, your balance is {amount} USD",
+  "error.network": "Quelque chose a mal tourné. Veuillez réessayer plus tard.",
+  "__source__:error.network": "Something went wrong. Please try again later."
 }

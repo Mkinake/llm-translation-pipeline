@@ -189,7 +189,7 @@ print("✅ QA PASSED — placeholders are safe")
 
 # ================================
 # 10. Write Output (merged fr.json)
-# ================================
+# =============================
 
 OUTPUT_FILE.parent.mkdir(exist_ok=True)
 

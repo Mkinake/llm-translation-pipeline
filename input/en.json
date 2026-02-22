@@ -1,5 +1,5 @@
 {
-  "login.title": "Welcome Again",
+  "login.title": "Welcome back Again",
   "login.subtitle": "Sign in to continue",
   "login.button": "Log in",
   "balance.message": "Hello {username}, your balance is {amount} USD",
