@@ -13,15 +13,15 @@ The system translates **only new or modified source strings**, not the entire fi
 ---
 
 # 📂 Project Structure
-├── pipeline.py
-├── glossary.csv
-├── input/
-│ └── en.json
-├── output/
-│ └── fr.json
-└── .github/
-└── workflows/
-└── translate.yml
+├── pipeline.py       
+├── glossary.csv       
+├── input/       
+│ └── en.json       
+├── output/       
+│ └── fr.json       
+└── .github/       
+└── workflows/       
+└── translate.yml       
 
 ---
 
@@ -34,18 +34,19 @@ The system translates **only new or modified source strings**, not the entire fi
 Any update and new content will trigger in the source file will transalte the CI/CD pipeline.
 
 **FULL WORKFLOW**
-Edit input/en.json
-       ↓
-git add input/en.json
-       ↓
-git commit -m "Update login text"
-       ↓
-git push
-       ↓
-GitHub Actions runs
-       ↓
-pipeline.py executes
-       ↓
-output/fr.json updated
-       ↓
-Bot commits changes
+
+Edit input/en.json       
+       ↓       
+git add input/en.json       
+       ↓       
+git commit -m "Update login text"       
+       ↓       
+git push       
+       ↓       
+GitHub Actions runs       
+       ↓       
+pipeline.py executes       
+       ↓       
+output/fr.json updated       
+       ↓       
+Bot commits changes       
