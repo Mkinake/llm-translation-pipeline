@@ -1,6 +1,6 @@
 {
-  "login.title": "Bienvenue à nouveau",
-  "__source__:login.title": "Welcome back Again",
+  "login.title": "Connectez-vous maintenant",
+  "__source__:login.title": "Log in now",
   "login.subtitle": "Connectez-vous pour continuer",
   "__source__:login.subtitle": "Sign in to continue",
   "login.button": "Se connecter",
